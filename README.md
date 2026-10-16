@@ -2,8 +2,6 @@
 
 Maoni is a live feedback wall: session attendees write short anonymous (or signed) notes — thoughts, questions, warm fuzzies — and stick them up on a shared board everyone can see, updated in real time.
 
-It was built for a GCP deployment workshop, so it doubles as a teaching app: it uses env-var configuration that fails fast, a Postgres database, and server-sent events for realtime updates.
-
 ## Stack
 
 | Layer | Tech |
@@ -56,18 +54,13 @@ Tables are created automatically on startup, so no migration step is needed for 
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/notes?sort=newest|popular` | List notes (max 100) |
+| `GET` | `/api/notes?sort=newest/popular` | List notes (max 100) |
 | `POST` | `/api/notes` | Create a note `{recipient, message, sender?}` |
 | `POST` | `/api/notes/{id}/like` | Like a note |
 | `GET` | `/api/notes/stream` | SSE feed of `notes_changed` events |
 | `GET` | `/api/meta` | Hostname of the instance serving you (used in the footer) |
 | `GET` | `/` | Single-page UI |
 
-## Workshop demo ideas
-
-- Kill the container and let Compose restart it — the wall comes back with its data.
-- Point out the footer host chip: refresh enough times behind a load balancer and you'll see different hostnames.
-- Post a note from one browser and watch it appear instantly in another — that's `LISTEN/NOTIFY` + SSE doing its thing.
 
 ## License
 

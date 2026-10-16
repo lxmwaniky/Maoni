@@ -1,15 +1,14 @@
 import asyncio
 import contextlib
-import select
 import socket
 import threading
 import time
 from datetime import datetime, timezone
 from typing import Literal
 
-import psycopg2
+import psycopg
 from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,7 +17,6 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 
 # Fail-fast configuration: The app refuses to start if DATABASE_URL is missing.
-# Great for demonstrating missing environment variables on the VM or in systemd.
 class Settings(BaseSettings):
     database_url: str
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -33,71 +31,53 @@ Base = declarative_base()
 _is_postgres = settings.database_url.startswith("postgresql")
 SSE_CHANNEL = "maoni_notes"
 
-# --- Server-Sent Events plumbing ---
-# _sse_clients holds one asyncio.Queue per connected browser. Every watcher
-# gets a `notes_changed` event the moment any note is created or liked.
+# --- Server-Sent Events (SSE) Plumbing ---
+# Holds one asyncio.Queue per connected browser tab.
 _sse_clients: set[asyncio.Queue] = set()
 _worker_loop: asyncio.AbstractEventLoop | None = None
 
 
-def _push_to_sse(message: str) -> None:
-    """Safe to call from any thread (sync endpoints run in a threadpool)."""
+def _push_to_sse(message: str = "refresh") -> None:
+    """Thread-safe fan-out: wakes up every connected browser's SSE stream."""
     if _worker_loop is None or not _sse_clients:
         return
     for queue in list(_sse_clients):
         _worker_loop.call_soon_threadsafe(queue.put_nowait, message)
 
 
-def notify_notes_changed() -> None:
-    """Wake every connected client immediately.
-
-    With Postgres we go through NOTIFY so this also works if you scale to
-    several app processes/workers. Without Postgres we push directly to the
-    clients attached to this process.
-    """
-    if _is_postgres:
-        try:
-            with engine.begin() as conn:
-                conn.execute(
-                    text(f"SELECT pg_notify('{SSE_CHANNEL}', 'refresh')")
-                )
-        except Exception:
-            # Never let notification failures break the user's request.
-            _push_to_sse("refresh")
-    else:
-        _push_to_sse("refresh")
-
-
 def _listen_for_changes() -> None:
-    """Background thread holding one dedicated LISTEN connection.
-
-    PostgreSQL pushes into this connection the instant any process notifies,
-    and we fan out to all attached SSE clients.
-    """
+    """Background thread holding a dedicated Postgres LISTEN connection."""
+    # Convert SQLAlchemy URL (e.g. postgresql+psycopg://) to standard libpq URI
+    pg_uri = settings.database_url.replace("postgresql+psycopg://", "postgresql://")
     while True:
-        conn = None
         try:
-            conn = psycopg2.connect(settings.database_url)
-            conn.set_isolation_level(
-                psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
-            )
-            with conn.cursor() as cur:
-                cur.execute(f"LISTEN {SSE_CHANNEL}")
-            while True:
-                if select.select([conn], [], [], 10) == ([], [], []):
-                    continue
-                conn.poll()
-                if conn.notifies:
-                    conn.notifies.clear()
-                    _push_to_sse("refresh")
+            with psycopg.connect(pg_uri, autocommit=True) as conn:
+                conn.execute(f"LISTEN {SSE_CHANNEL}")
+                for notify in conn.notifies():
+                    _push_to_sse(notify.payload or "refresh")
         except Exception:
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                conn = None
             time.sleep(3)
+
+
+def _install_pg_trigger() -> None:
+    """Installs a Postgres trigger so even raw SQL changes in psql fire SSE!"""
+    if not _is_postgres:
+        return
+    ddl = f"""
+    CREATE OR REPLACE FUNCTION notify_maoni_changes() RETURNS trigger AS $$
+    BEGIN
+        PERFORM pg_notify('{SSE_CHANNEL}', 'refresh');
+        RETURN NULL;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS maoni_notes_trigger ON notes;
+    CREATE TRIGGER maoni_notes_trigger
+    AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE ON notes
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_maoni_changes();
+    """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
 
 
 @contextlib.asynccontextmanager
@@ -105,6 +85,7 @@ async def lifespan(app: FastAPI):
     global _worker_loop
     _worker_loop = asyncio.get_running_loop()
     if _is_postgres:
+        _install_pg_trigger()
         threading.Thread(target=_listen_for_changes, daemon=True).start()
     yield
 
@@ -121,7 +102,6 @@ class Note(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-# Auto-create tables on startup so you don't need Alembic migrations during the demo
 Base.metadata.create_all(bind=engine)
 
 
@@ -160,7 +140,6 @@ def get_db():
 # --- Routes ---
 @app.get("/api/meta")
 def get_meta():
-    """Returns the hostname of the machine/container running the app."""
     return {"hostname": socket.gethostname()}
 
 
@@ -176,24 +155,29 @@ def get_notes(sort: Literal["newest", "popular"] = "newest", db: Session = Depen
 
 @app.get("/api/notes/stream")
 async def notes_stream(request: Request):
-    """Server-Sent Events feed: emits `notes_changed` the instant the wall changes.
+    """Server-Sent Events (SSE) stream that pushes instant updates to browsers."""
+    async def event_generator():
+        queue: asyncio.Queue = asyncio.Queue()
+        _sse_clients.add(queue)
+        try:
+            yield ": connected\n\n"
+            while not await request.is_disconnected():
+                try:
+                    message = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield f"event: notes_changed\ndata: {message}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            _sse_clients.discard(queue)
 
-    The frontend refetches on this signal, so new notes and like counts appear
-    in every open browser within milliseconds.
-    """
-    queue: asyncio.Queue = asyncio.Queue()
-    _sse_clients.add(queue)
-    try:
-        yield ": connected\n\n"
-        while not await request.is_disconnected():
-            try:
-                message = await asyncio.wait_for(queue.get(), timeout=15.0)
-            except asyncio.TimeoutError:
-                yield ": keepalive\n\n"
-                continue
-            yield f"event: notes_changed\ndata: {message}\n\n"
-    finally:
-        _sse_clients.discard(queue)
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # Tells Nginx NOT to buffer SSE events!
+        },
+    )
 
 
 @app.post("/api/notes", response_model=NoteResponse, status_code=201)
@@ -207,7 +191,8 @@ def create_note(payload: NoteCreate, db: Session = Depends(get_db)):
     db.add(note)
     db.commit()
     db.refresh(note)
-    notify_notes_changed()
+    if not _is_postgres:
+        _push_to_sse()
     return note
 
 
@@ -219,7 +204,8 @@ def like_note(note_id: int, db: Session = Depends(get_db)):
     note.likes += 1
     db.commit()
     db.refresh(note)
-    notify_notes_changed()
+    if not _is_postgres:
+        _push_to_sse()
     return note
 
 
