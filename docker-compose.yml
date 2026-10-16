@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: maoni_user
+      POSTGRES_PASSWORD: maoni_pass
+      POSTGRES_DB: maoni_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maoni_user -d maoni_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://maoni_user:maoni_pass@db:5432/maoni_db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

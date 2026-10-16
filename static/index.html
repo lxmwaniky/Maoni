@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Maoni — Share a Note</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Caveat:wght@500..700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --wall: #EAEFF2;
+        --ink: #232936;
+        --muted: #74808f;
+        --paper-line: #d6dde5;
+      }
+
+      html {
+        background: #EAEFF2;
+      }
+
+      body {
+        font-family: "Bricolage Grotesque", ui-sans-serif, system-ui,
+          sans-serif;
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      [x-cloak] {
+        display: none !important;
+      }
+
+      :focus-visible {
+        outline: 2px solid #2c3a55;
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      /* ---------- sticky papers ---------- */
+
+      .note {
+        position: relative;
+        background: var(--paper);
+        border-radius: 3px;
+        box-shadow:
+          0 1px 2px rgba(30, 38, 52, 0.1),
+          0 10px 20px -10px rgba(30, 38, 52, 0.22);
+        transform: rotate(var(--tilt, 0deg));
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
+        animation: stick 0.32s cubic-bezier(0.2, 0.9, 0.35, 1.15) both;
+      }
+
+      .note-modal {
+        position: relative;
+        background: var(--paper, #fff3b0);
+        border-radius: 3px;
+        box-shadow:
+          0 1px 2px rgba(30, 38, 52, 0.1),
+          0 20px 45px -12px rgba(30, 38, 52, 0.4);
+        transform: rotate(-0.4deg);
+      }
+
+      .clickable {
+        cursor: pointer;
+      }
+
+      .clickable:hover {
+        transform: rotate(0deg) translateY(-5px) scale(1.015);
+        box-shadow:
+          0 2px 3px rgba(30, 38, 52, 0.08),
+          0 20px 32px -10px rgba(30, 38, 52, 0.3);
+      }
+
+      .clickable:active {
+        transition-duration: 0.06s;
+        transform: rotate(0deg) translateY(-1px) scale(0.99);
+      }
+
+      @keyframes stick {
+        from {
+          opacity: 0;
+          transform: rotate(calc(var(--tilt, 0deg) - 3deg)) scale(1.05);
+        }
+        to {
+          opacity: 1;
+          transform: rotate(var(--tilt, 0deg)) scale(1);
+        }
+      }
+
+      .tape {
+        position: absolute;
+        top: -11px;
+        left: 50%;
+        width: 74px;
+        height: 22px;
+        transform: translateX(-50%) rotate(var(--tape-tilt, -3deg));
+        background: rgba(232, 229, 214, 0.8);
+        box-shadow: 0 1px 2px rgba(30, 38, 52, 0.12);
+        clip-path: polygon(
+          1% 2%, 99% 0%, 100% 38%, 96% 55%, 100% 70%, 98% 98%, 55% 100%,
+          30% 96%, 2% 100%, 0% 72%, 3% 45%, 0% 25%
+        );
+        transition: transform 0.2s ease;
+      }
+
+      .clickable:hover .tape {
+        transform: translateX(-50%)
+          rotate(calc(var(--tape-tilt, -3deg) + 1.5deg)) scaleX(1.08);
+      }
+
+      .paper-y { --paper: #fff3b0; }
+      .paper-b { --paper: #cfe9fa; }
+      .paper-p { --paper: #fbdfec; }
+      .paper-m { --paper: #d9f3e3; }
+      .paper-c { --paper: #ffe6cf; }
+
+      .hand {
+        font-family: "Caveat", cursive;
+      }
+
+      /* ---------- hearts ---------- */
+
+      .like-heart {
+        display: inline-block;
+        transition: transform 0.18s ease;
+      }
+
+      .like-btn:hover .like-heart {
+        transform: scale(1.3) rotate(-10deg);
+      }
+
+      .like-btn:active .like-heart {
+        transform: scale(0.85);
+      }
+
+      .like-btn.popped .like-heart {
+        animation: heart-pop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+      }
+
+      @keyframes heart-pop {
+        0% { transform: scale(1); }
+        35% { transform: scale(1.55) rotate(-14deg); }
+        100% { transform: scale(1); }
+      }
+
+      /* ---------- marker-highlight sort tabs ---------- */
+
+      .tab {
+        background-image: linear-gradient(
+          to right,
+          transparent 0%,
+          #ffe873 0%
+        );
+        background-size: 0% 68%;
+        background-repeat: no-repeat;
+        background-position: 0 55%;
+        padding: 0 0.3rem;
+        border-radius: 3px;
+        transition: background-size 0.22s ease;
+      }
+
+      .tab.active {
+        background-size: 100% 68%;
+      }
+
+      .field {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid rgba(30, 38, 52, 0.14);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-family: "Caveat", cursive;
+        font-size: 1.25rem;
+        line-height: 1.3;
+        color: var(--ink);
+      }
+
+      .field::placeholder {
+        color: #9c8f52;
+        opacity: 1;
+      }
+
+      .field:focus {
+        outline: none;
+        border-color: rgba(30, 38, 52, 0.45);
+        background: rgba(255, 255, 255, 0.85);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .note,
+        .tape,
+        .like-heart,
+        .like-btn.popped .like-heart {
+          animation: none;
+          transition: none;
+        }
+        .tab {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+
+  <body
+    class="bg-[#EAEFF2] text-[#232936] min-h-screen flex flex-col"
+    x-data="maoniApp()"
+    @keydown.escape.window="previewNote = null"
+  >
+    <!-- Header -->
+    <header class="bg-[#EAEFF2]/85 backdrop-blur-sm sticky top-0 z-10">
+      <div
+        class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between"
+      >
+        <div class="relative">
+          <h1 class="text-2xl font-extrabold tracking-tight leading-none">
+            maoni<span class="text-[#c9a227]">.</span>
+          </h1>
+          <p class="text-[13px] mt-1 text-[#74808f]">
+            unfiltered session notes &amp; feedback
+          </p>
+
+          <!-- doodle arrow, hidden on small screens -->
+          <svg
+            class="absolute -top-3 -right-[92px] hidden md:block w-16 pointer-events-none"
+            viewBox="0 0 64 40"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M62 36 C 46 38, 22 34, 8 20"
+              stroke="#232936"
+              stroke-width="2"
+              stroke-linecap="round"
+              opacity="0.5"
+            />
+            <path
+              d="M15 17 L 7 19 L 12 26"
+              stroke="#232936"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              opacity="0.5"
+            />
+          </svg>
+        </div>
+
+        <button
+          @click="modalOpen = true"
+          class="bg-[#232936] hover:bg-[#39404f] text-white text-sm font-semibold pl-4 pr-5 py-2.5 rounded-2xl transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:shadow-none cursor-pointer flex items-center gap-2"
+        >
+          <span class="text-base leading-none -translate-y-px">+</span>
+          Write a note
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Feed -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-3 flex-1 w-full">
+      <!-- Controls -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="inline-flex items-center gap-1.5 text-sm font-semibold">
+          <button
+            @click="changeSort('newest')"
+            :class="sort === 'newest' ? 'active text-[#232936]' : 'text-[#74808f] hover:text-[#4a5462]'"
+            class="tab cursor-pointer"
+          >
+            Newest
+          </button>
+          <button
+            @click="changeSort('popular')"
+            :class="sort === 'popular' ? 'active text-[#232936]' : 'text-[#74808f] hover:text-[#4a5462]'"
+            class="tab cursor-pointer"
+          >
+            Popular
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        x-show="!loading && notes.length === 0"
+        x-cloak
+        class="mx-auto max-w-md text-center py-10 px-6 mt-1"
+      >
+        <div class="relative inline-block paper-y note -rotate-2 px-9 py-7" style="--tilt: -2deg">
+          <span class="tape"></span>
+          <p class="hand text-2xl leading-snug text-[#3b4350]">
+            Nothing on the wall yet.
+          </p>
+          <button
+            @click="modalOpen = true"
+            class="hand text-2xl text-[#2c3a55] underline decoration-wavy decoration-[#c9a227] underline-offset-4 hover:decoration-[#232936] transition cursor-pointer"
+          >
+            stick the first one up
+          </button>
+        </div>
+      </div>
+
+      <!-- Notes wall -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-7">
+        <template x-for="(note, i) in notes" :key="note.id">
+          <div
+            class="note clickable p-4 pt-5 flex flex-col min-h-[9.5rem]"
+            :class="['paper-y','paper-b','paper-p','paper-m','paper-c'][note.id % 5]"
+            :style="`--tilt: ${[-1.4, 1.1, -0.7, 1.6, -1.2, 0.9][note.id % 6]}deg; --tape-tilt: ${[-3, 2, -1.5][note.id % 3]}deg; animation-delay: ${Math.min(i * 45, 400)}ms`"
+            role="button"
+            tabindex="0"
+            @click="openPreview(note)"
+            @keydown.enter.prevent="openPreview(note)"
+            @keydown.space.prevent="openPreview(note)"
+            :aria-label="`Read note to ${note.recipient}`"
+          >
+            <span class="tape"></span>
+
+            <div>
+              <div class="hand text-lg text-[#5b6472] leading-tight">
+                to
+                <span
+                  class="text-[#232936] font-semibold"
+                  x-text="note.recipient"
+                ></span>
+              </div>
+              <p
+                class="hand text-[1.3rem] leading-[1.3] whitespace-pre-line break-words mt-1 text-[#333b48]"
+                x-text="note.message"
+              ></p>
+            </div>
+
+            <div class="mt-auto pt-3 flex items-end justify-between gap-2">
+              <div class="hand text-lg text-[#5b6472] leading-none truncate">
+                — <span x-text="note.sender"></span>
+              </div>
+
+              <button
+                @click.stop="likeNote(note)"
+                class="like-btn hand inline-flex items-center gap-1 text-lg leading-none px-1 transition cursor-pointer"
+                :class="(hasLiked(note.id) ? 'text-rose-600' : 'text-[#8a939f] hover:text-rose-500') + (poppedIds.includes(note.id) ? ' popped' : '')"
+                :aria-pressed="hasLiked(note.id)"
+                :aria-label="`Like note (${note.likes} likes)`"
+              >
+                <span class="like-heart" x-text="hasLiked(note.id) ? '♥' : '♡'"></span>
+                <span
+                  class="text-base font-semibold"
+                  x-text="note.likes"
+                ></span>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </main>
+
+    <!-- Footer with VM/Container Hostname -->
+    <footer class="border-t border-[#d6dde5] py-3.5 mt-6">
+      <div
+        class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between text-xs text-[#74808f]"
+      >
+        <span>Maoni — GCP Compute Engine Session</span>
+        <span
+          class="font-mono bg-[#dde4ea] text-[#4a5462] px-2 py-1 rounded-md border border-[#c9d2da]"
+        >
+          host: <strong x-text="hostname">…</strong>
+        </span>
+      </div>
+    </footer>
+
+    <!-- Write Note Modal -->
+    <div
+      x-show="modalOpen"
+      x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1d2330]/40 backdrop-blur-[2px]"
+    >
+      <div
+        @click.away="modalOpen = false"
+        class="note-modal max-w-md w-full px-7 pb-7 pt-10 sm:-mt-10"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 scale-110"
+        x-transition:enter-end="opacity-100 scale-100"
+      >
+        <span class="tape"></span>
+
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="hand text-3xl text-[#232936]">Write a note</h2>
+          <button
+            @click="modalOpen = false"
+            aria-label="Close"
+            class="hand text-2xl text-[#8c7c3a] hover:text-[#232936] hover:rotate-90 transition-all duration-200 cursor-pointer leading-none"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form @submit.prevent="submitNote" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-[#5b5324] mb-1.5"
+              >To</label
+            >
+            <input
+              type="text"
+              x-model="form.recipient"
+              placeholder="the speaker, cloud devs, everyone…"
+              maxlength="50"
+              required
+              class="field"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#5b5324] mb-1.5"
+              >Your note</label
+            >
+            <textarea
+              x-model="form.message"
+              rows="4"
+              placeholder="share a thought, question, or feedback…"
+              maxlength="280"
+              required
+              class="field resize-none"
+            ></textarea>
+            <div
+              class="text-right text-[11px] font-medium text-[#8c7c3a] mt-1"
+              x-text="`${form.message.length}/280`"
+            ></div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#5b5324] mb-1.5"
+              >Signed (optional)</label
+            >
+            <input
+              type="text"
+              x-model="form.sender"
+              placeholder="Anonymous"
+              maxlength="50"
+              class="field"
+            />
+          </div>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              @click="modalOpen = false"
+              class="text-xs font-semibold text-[#6b6126] hover:text-[#232936] px-2 py-2 cursor-pointer transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="submitting"
+              class="bg-[#232936] hover:bg-[#39404f] disabled:opacity-50 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition cursor-pointer"
+            >
+              <span x-text="submitting ? 'Posting…' : 'Post note'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Note Preview Modal -->
+    <div
+      x-show="previewNote"
+      x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1d2330]/45 backdrop-blur-[3px]"
+    >
+      <template x-if="previewNote">
+        <div
+          @click.away="previewNote = null"
+          class="note-modal max-w-lg w-full px-8 pb-8 pt-11"
+          :class="['paper-y','paper-b','paper-p','paper-m','paper-c'][previewNote.id % 5]"
+          x-transition:enter="transition ease-out duration-200"
+          x-transition:enter-start="opacity-0 scale-90"
+          x-transition:enter-end="opacity-100 scale-100"
+          x-transition:leave="transition ease-in duration-150"
+          x-transition:leave-start="opacity-100 scale-100"
+          x-transition:leave-end="opacity-0 scale-95"
+        >
+          <span class="tape"></span>
+
+          <div class="flex items-start justify-between mb-4 gap-3">
+            <div class="hand text-2xl text-[#5b6472] leading-tight">
+              to
+              <span
+                class="text-[#232936] font-semibold"
+                x-text="previewNote.recipient"
+              ></span>
+            </div>
+            <button
+              @click="previewNote = null"
+              aria-label="Close"
+              class="hand text-2xl text-[#8a939f] hover:text-[#232936] hover:rotate-90 transition-all duration-200 cursor-pointer leading-none shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p
+            class="hand text-[1.75rem] leading-[1.3] whitespace-pre-line break-words text-[#333b48]"
+            x-text="previewNote.message"
+          ></p>
+
+          <div
+            class="mt-6 pt-4 border-t border-dashed border-[#3a4352]/25 flex items-center justify-between gap-3"
+          >
+            <div>
+              <div class="hand text-xl text-[#5b6472] leading-none">
+                — <span x-text="previewNote.sender"></span>
+              </div>
+              <div
+                class="text-xs font-medium text-[#74808f] mt-1.5"
+                x-text="formatDate(previewNote.created_at)"
+              ></div>
+            </div>
+
+            <button
+              @click="likeNote(previewNote)"
+              class="like-btn hand inline-flex items-center gap-1.5 text-xl leading-none px-2 py-1 rounded-lg transition cursor-pointer border border-transparent hover:border-[#3a4352]/20"
+              :class="(hasLiked(previewNote.id) ? 'text-rose-600' : 'text-[#5b6472] hover:text-rose-500') + (poppedIds.includes(previewNote.id) ? ' popped' : '')"
+              :aria-pressed="hasLiked(previewNote.id)"
+              :aria-label="`Like note (${previewNote.likes} likes)`"
+            >
+              <span class="like-heart" x-text="hasLiked(previewNote.id) ? '♥' : '♡'"></span>
+              <span
+                class="text-lg font-semibold"
+                x-text="previewNote.likes"
+              ></span>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <script>
+      function maoniApp() {
+        return {
+          notes: [],
+          hostname: "loading...",
+          sort: "newest",
+          loading: true,
+          modalOpen: false,
+          previewNote: null,
+          poppedIds: [],
+          submitting: false,
+          likedIds: JSON.parse(localStorage.getItem("maoni_likes") || "[]"),
+          form: { recipient: "", message: "", sender: "" },
+
+          async fetchNotes(silent = false) {
+            if (!silent) this.loading = true;
+            try {
+              const res = await fetch(`/api/notes?sort=${this.sort}`);
+              if (res.ok) {
+                this.notes = await res.json();
+                if (this.previewNote) {
+                  const fresh = this.notes.find(
+                    (n) => n.id === this.previewNote.id
+                  );
+                  if (fresh) Object.assign(this.previewNote, fresh);
+                }
+              }
+            } finally {
+              if (!silent) this.loading = false;
+            }
+          },
+
+          async fetchMeta() {
+            try {
+              const res = await fetch("/api/meta");
+              const data = await res.json();
+              this.hostname = data.hostname;
+            } catch (e) {
+              this.hostname = "unknown";
+            }
+          },
+
+          startPolling() {
+            if (this._pollTimer) clearInterval(this._pollTimer);
+            this._pollTimer = setInterval(() => {
+              if (document.visibilityState !== "visible") return;
+              this.fetchNotes(true);
+            }, 5000);
+          },
+
+          changeSort(newSort) {
+            this.sort = newSort;
+            this.fetchNotes();
+          },
+
+          openPreview(note) {
+            this.previewNote = note;
+          },
+
+          formatDate(iso) {
+            try {
+              const d = new Date(iso);
+              return d.toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              });
+            } catch (e) {
+              return "";
+            }
+          },
+
+          async submitNote() {
+            this.submitting = true;
+            try {
+              const res = await fetch("/api/notes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.form),
+              });
+              if (res.ok) {
+                this.form = { recipient: "", message: "", sender: "" };
+                this.modalOpen = false;
+                this.sort = "newest";
+                await this.fetchNotes();
+              }
+            } finally {
+              this.submitting = false;
+            }
+          },
+
+          hasLiked(id) {
+            return this.likedIds.includes(id);
+          },
+
+          async likeNote(note) {
+            if (this.hasLiked(note.id)) return;
+
+            note.likes++;
+            this.likedIds.push(note.id);
+            localStorage.setItem("maoni_likes", JSON.stringify(this.likedIds));
+
+            const id = note.id;
+            this.poppedIds.push(id);
+            setTimeout(() => {
+              this.poppedIds = this.poppedIds.filter((x) => x !== id);
+            }, 450);
+
+            await fetch(`/api/notes/${note.id}/like`, { method: "POST" });
+          },
+
+          async init() {
+            await this.fetchMeta();
+            await this.fetchNotes();
+            this.startPolling();
+          },
+        };
+      }
+    </script>
+  </body>
+</html>
