@@ -15,19 +15,19 @@
     />
     <style>
       :root {
-        --wall: #EAEFF2;
+        --wall: #eaeff2;
         --ink: #232936;
         --muted: #74808f;
         --paper-line: #d6dde5;
       }
 
       html {
-        background: #EAEFF2;
+        background: #eaeff2;
       }
 
       body {
-        font-family: "Bricolage Grotesque", ui-sans-serif, system-ui,
-          sans-serif;
+        font-family:
+          "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
         color: var(--ink);
         -webkit-font-smoothing: antialiased;
       }
@@ -105,8 +105,18 @@
         background: rgba(232, 229, 214, 0.8);
         box-shadow: 0 1px 2px rgba(30, 38, 52, 0.12);
         clip-path: polygon(
-          1% 2%, 99% 0%, 100% 38%, 96% 55%, 100% 70%, 98% 98%, 55% 100%,
-          30% 96%, 2% 100%, 0% 72%, 3% 45%, 0% 25%
+          1% 2%,
+          99% 0%,
+          100% 38%,
+          96% 55%,
+          100% 70%,
+          98% 98%,
+          55% 100%,
+          30% 96%,
+          2% 100%,
+          0% 72%,
+          3% 45%,
+          0% 25%
         );
         transition: transform 0.2s ease;
       }
@@ -116,11 +126,21 @@
           rotate(calc(var(--tape-tilt, -3deg) + 1.5deg)) scaleX(1.08);
       }
 
-      .paper-y { --paper: #fff3b0; }
-      .paper-b { --paper: #cfe9fa; }
-      .paper-p { --paper: #fbdfec; }
-      .paper-m { --paper: #d9f3e3; }
-      .paper-c { --paper: #ffe6cf; }
+      .paper-y {
+        --paper: #fff3b0;
+      }
+      .paper-b {
+        --paper: #cfe9fa;
+      }
+      .paper-p {
+        --paper: #fbdfec;
+      }
+      .paper-m {
+        --paper: #d9f3e3;
+      }
+      .paper-c {
+        --paper: #ffe6cf;
+      }
 
       .hand {
         font-family: "Caveat", cursive;
@@ -146,19 +166,21 @@
       }
 
       @keyframes heart-pop {
-        0% { transform: scale(1); }
-        35% { transform: scale(1.55) rotate(-14deg); }
-        100% { transform: scale(1); }
+        0% {
+          transform: scale(1);
+        }
+        35% {
+          transform: scale(1.55) rotate(-14deg);
+        }
+        100% {
+          transform: scale(1);
+        }
       }
 
       /* ---------- marker-highlight sort tabs ---------- */
 
       .tab {
-        background-image: linear-gradient(
-          to right,
-          transparent 0%,
-          #ffe873 0%
-        );
+        background-image: linear-gradient(to right, transparent 0%, #ffe873 0%);
         background-size: 0% 68%;
         background-repeat: no-repeat;
         background-position: 0 55%;
@@ -290,7 +312,10 @@
         x-cloak
         class="mx-auto max-w-md text-center py-10 px-6 mt-1"
       >
-        <div class="relative inline-block paper-y note -rotate-2 px-9 py-7" style="--tilt: -2deg">
+        <div
+          class="relative inline-block paper-y note -rotate-2 px-9 py-7"
+          style="--tilt: -2deg"
+        >
           <span class="tape"></span>
           <p class="hand text-2xl leading-snug text-[#3b4350]">
             Nothing on the wall yet.
@@ -305,7 +330,9 @@
       </div>
 
       <!-- Notes wall -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-7">
+      <div
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-7"
+      >
         <template x-for="(note, i) in notes" :key="note.id">
           <div
             class="note clickable p-4 pt-5 flex flex-col min-h-[9.5rem]"
@@ -346,7 +373,10 @@
                 :aria-pressed="hasLiked(note.id)"
                 :aria-label="`Like note (${note.likes} likes)`"
               >
-                <span class="like-heart" x-text="hasLiked(note.id) ? '♥' : '♡'"></span>
+                <span
+                  class="like-heart"
+                  x-text="hasLiked(note.id) ? '♥' : '♡'"
+                ></span>
                 <span
                   class="text-base font-semibold"
                   x-text="note.likes"
@@ -526,7 +556,10 @@
               :aria-pressed="hasLiked(previewNote.id)"
               :aria-label="`Like note (${previewNote.likes} likes)`"
             >
-              <span class="like-heart" x-text="hasLiked(previewNote.id) ? '♥' : '♡'"></span>
+              <span
+                class="like-heart"
+                x-text="hasLiked(previewNote.id) ? '♥' : '♡'"
+              ></span>
               <span
                 class="text-lg font-semibold"
                 x-text="previewNote.likes"
@@ -559,7 +592,7 @@
                 this.notes = await res.json();
                 if (this.previewNote) {
                   const fresh = this.notes.find(
-                    (n) => n.id === this.previewNote.id
+                    (n) => n.id === this.previewNote.id,
                   );
                   if (fresh) Object.assign(this.previewNote, fresh);
                 }
@@ -604,7 +637,7 @@
             }
             this._es = new EventSource("/api/notes/stream");
             this._es.addEventListener("notes_changed", () =>
-              this.fetchNotes(true)
+              this.fetchNotes(true),
             );
             this._es.onopen = () => this.stopPolling();
             this._es.onerror = () => this.startPolling();
